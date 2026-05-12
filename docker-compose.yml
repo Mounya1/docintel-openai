@@ -1,0 +1,123 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────
+# DocIntel — Full Stack Docker Compose
+#
+# Services:
+#   postgres  — primary database (swap SQLite in dev)
+#   redis     — Celery broker + result backend
+#   api       — FastAPI application
+#   worker    — Celery worker for background document processing
+#   frontend  — Vite/React UI (optional, can run separately)
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-docintel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docintel_secret}
+      POSTGRES_DB:       ${POSTGRES_DB:-docintel}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-docintel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI Backend ────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV:             production
+      DATABASE_URL:        postgresql+asyncpg://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD:-docintel_secret}@postgres:5432/${POSTGRES_DB:-docintel}
+      OPENAI_API_KEY:      ${OPENAI_API_KEY}
+      JWT_SECRET_KEY:      ${JWT_SECRET_KEY:-change-me-in-production}
+      APP_SECRET_KEY:      ${APP_SECRET_KEY:-change-me-in-production}
+      REDIS_URL:           redis://redis:6379/0
+      CELERY_BROKER_URL:   redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      FRONTEND_URL:        ${FRONTEND_URL:-http://localhost:5173}
+      LOG_LEVEL:           INFO
+      UPLOAD_DIR:          /app/uploads
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Celery Worker ──────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A app.worker worker --loglevel=info --concurrency=4
+    environment:
+      APP_ENV:             production
+      DATABASE_URL:        postgresql+asyncpg://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD:-docintel_secret}@postgres:5432/${POSTGRES_DB:-docintel}
+      OPENAI_API_KEY:      ${OPENAI_API_KEY}
+      REDIS_URL:           redis://redis:6379/0
+      CELERY_BROKER_URL:   redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      UPLOAD_DIR:          /app/uploads
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Flower (Celery monitoring) — optional ──────────────────
+  flower:
+    image: mher/flower:2.0
+    restart: unless-stopped
+    command: celery flower --broker=redis://redis:6379/0 --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
+  logs:
