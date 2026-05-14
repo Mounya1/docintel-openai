@@ -258,3 +258,106 @@ async def get_document(
     detail["reviews"] = reviews
 
     return detail
+
+from fastapi.responses import FileResponse
+
+@router.get("/{doc_id}/download")
+async def download_document(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Document).where(Document.id == doc_id))
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = settings.upload_path / doc.file_path
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on server")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=doc.original_name,
+        media_type=doc.mime_type,
+    )
+@router.post("/{doc_id}/review", response_model=SuccessResponse)
+async def review_document(
+    doc_id: str,
+    body: ReviewRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Document).where(Document.id == doc_id))
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    doc.status = "approved" if body.decision == "approved" else "rejected"
+
+    review = Review(
+        id=str(uuid.uuid4()),
+        document_id=doc_id,
+        extraction_id=body.extraction_id or "",
+        status="completed",
+        decision=body.decision,
+        notes=body.notes,
+        reviewed_by=current_user.id,
+    )
+
+    db.add(review)
+
+    await write_audit_log(
+        db=db,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        action=f"DOCUMENT_{body.decision.upper()}",
+        resource_type="document",
+        resource_id=doc_id,
+        resource_name=doc.name,
+        ip_address=get_client_ip(request),
+    )
+
+    await db.commit()
+
+    return SuccessResponse(
+        message=f"Document {body.decision}"
+    )
+@router.delete("/{doc_id}", response_model=SuccessResponse)
+async def delete_document(
+    doc_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    result = await db.execute(select(Document).where(Document.id == doc_id))
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = settings.upload_path / doc.file_path
+
+    if file_path.exists():
+        file_path.unlink(missing_ok=True)
+
+    await db.delete(doc)
+
+    await write_audit_log(
+        db=db,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        action="DOCUMENT_DELETED",
+        resource_type="document",
+        resource_id=doc_id,
+        resource_name=doc.name,
+        ip_address=get_client_ip(request),
+    )
+
+    await db.commit()
+
+    return SuccessResponse(message="Document deleted")

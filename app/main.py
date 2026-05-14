@@ -19,6 +19,8 @@ from app.routes import auth, documents, extractions, schemas, audit, analytics, 
 from dotenv import load_dotenv
 from pathlib import Path
 
+
+
 # load .env from project root
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 

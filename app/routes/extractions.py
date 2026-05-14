@@ -2,6 +2,7 @@
 
 import json
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,15 +23,44 @@ async def get_extractions(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Extraction).where(Extraction.document_id == doc_id).order_by(desc(Extraction.version))
+        select(Extraction)
+        .where(Extraction.document_id == doc_id)
+        .order_by(desc(Extraction.version))
     )
     extractions = result.scalars().all()
+
     out = []
     for e in extractions:
-        eout = ExtractionOut.model_validate(e)
-        eout.fields = json.loads(e.fields) if e.fields else None
-        eout.confidence_per_field = json.loads(e.confidence_per_field) if e.confidence_per_field else None
+        try:
+            fields = json.loads(e.fields) if isinstance(e.fields, str) else e.fields or {}
+        except Exception:
+            fields = {}
+
+        try:
+            confidence_per_field = (
+                json.loads(e.confidence_per_field)
+                if isinstance(e.confidence_per_field, str)
+                else e.confidence_per_field or {}
+            )
+        except Exception:
+            confidence_per_field = {}
+
+        eout = ExtractionOut.model_validate({
+            "id": e.id,
+            "document_id": e.document_id,
+            "version": e.version,
+            "schema_id": e.schema_id,
+            "fields": fields,
+            "confidence_overall": e.confidence_overall,
+            "confidence_per_field": confidence_per_field,
+            "llm_model": e.model_used,
+            "processing_time_ms": e.processing_time_ms,
+            "status": e.status,
+            "error": e.error,
+            "created_at": e.created_at,
+        })
         out.append(eout)
+
     return out
 
 
@@ -57,15 +87,17 @@ async def update_fields(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Extraction).where(Extraction.id == extraction_id))
-    extraction: Extraction = result.scalar_one_or_none()
+    extraction: Extraction | None = result.scalar_one_or_none()
     if not extraction:
         raise HTTPException(status_code=404, detail="Extraction not found")
 
-    # Merge new fields over existing
-    current_fields = json.loads(extraction.fields) if extraction.fields else {}
+    try:
+        current_fields = json.loads(extraction.fields) if isinstance(extraction.fields, str) else extraction.fields or {}
+    except Exception:
+        current_fields = {}
+
     merged = {**current_fields, **body.fields}
 
-    # Create a new version
     ver_result = await db.execute(
         select(func.max(Extraction.version)).where(Extraction.document_id == extraction.document_id)
     )
@@ -80,19 +112,28 @@ async def update_fields(
         fields=json.dumps(merged),
         raw_text=extraction.raw_text,
         confidence_overall=extraction.confidence_overall,
-        confidence_per_field=extraction.confidence_per_field,
+        confidence_per_field=(
+            extraction.confidence_per_field
+            if isinstance(extraction.confidence_per_field, str)
+            else json.dumps(extraction.confidence_per_field or {})
+        ),
         model_used="human_correction",
         processing_time_ms=0,
         status="completed",
+        error=None,
         created_by=current_user.id,
     )
     db.add(new_extraction)
 
     await write_audit_log(
-        db=db, user_id=current_user.id, user_name=current_user.name,
-        action="FIELDS_EDITED", resource_type="extraction",
+        db=db,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        action="FIELDS_EDITED",
+        resource_type="extraction",
         resource_id=new_id,
         details={"changed_fields": list(body.fields.keys()), "version": new_version},
     )
+
     await db.commit()
     return SuccessResponse(message=f"Fields saved as version {new_version}")
