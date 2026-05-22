@@ -83,6 +83,21 @@ async def distinct_actions(
 
 
 def _parse_log(l: AuditLog) -> AuditLogOut:
-    out = AuditLogOut.model_validate(l)
-    out.details = json.loads(l.details) if l.details else None
-    return out
+    details = None
+    if l.details:
+        try:
+            details = json.loads(l.details) if isinstance(l.details, str) else l.details
+        except Exception:
+            details = None
+    return AuditLogOut(
+        id=l.id,
+        user_id=l.user_id,
+        user_name=l.user_name,
+        action=l.action,
+        resource_type=l.resource_type,
+        resource_id=l.resource_id,
+        resource_name=l.resource_name,
+        details=details,
+        ip_address=l.ip_address,
+        created_at=l.created_at,
+    )

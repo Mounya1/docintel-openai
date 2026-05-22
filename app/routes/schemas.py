@@ -112,7 +112,18 @@ async def delete_schema(
 
 
 def _parse_schema(s: Schema) -> SchemaOut:
-    out = SchemaOut.model_validate(s)
-    out.definition = json.loads(s.definition) if isinstance(s.definition, str) else s.definition
-    out.validation_rules = json.loads(s.validation_rules) if s.validation_rules else []
-    return out
+    definition = json.loads(s.definition) if isinstance(s.definition, str) else (s.definition or {})
+    validation_rules = json.loads(s.validation_rules) if isinstance(s.validation_rules, str) else (s.validation_rules or [])
+    return SchemaOut(
+        id=s.id,
+        name=s.name,
+        doc_type=s.doc_type,
+        version=s.version,
+        status=s.status,
+        definition=definition,
+        validation_rules=validation_rules,
+        created_by=s.created_by,
+        created_at=s.created_at,
+        updated_at=s.updated_at,
+        doc_count=0,
+    )

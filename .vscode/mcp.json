@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "docintel-mcp": {
+      "type": "stdio",
+      "command": "C:\\Windows\\System32\\wsl.exe",
+      "args": [
+        "-e",
+        "/mnt/c/Users/mouny/docintel-openai/.venv/bin/python3",
+        "-m",
+        "app.mcp_server"
+      ],
+      "cwd": "C:\\Users\\mouny\\docintel-openai",
+      "env": {
+        "DATABASE_URL": "postgresql+asyncpg://docintel:docintel_secret@127.0.0.1:5432/docintel"
+      }
+    }
+  }
+}

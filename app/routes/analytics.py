@@ -38,13 +38,13 @@ async def overview(
 
     # Last 7 days document volume
     daily_res = await db.execute(text("""
-        SELECT date(created_at) as day, COUNT(*) as count
+        SELECT DATE(created_at) as day, COUNT(*) as count
         FROM documents
-        WHERE created_at >= date('now', '-7 days')
-        GROUP BY date(created_at)
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY DATE(created_at)
         ORDER BY day
     """))
-    last_7 = [DailyCount(day=row[0], count=row[1]) for row in daily_res.all()]
+    last_7 = [DailyCount(day=str(row[0]), count=row[1]) for row in daily_res.all()]
 
     # Confidence distribution
     high_res   = await db.execute(select(func.count(Extraction.id)).where(Extraction.confidence_overall >= 90))

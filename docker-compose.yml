@@ -1,18 +1,5 @@
-version: '3.9'
-
-# ─────────────────────────────────────────────────────────────
-# DocIntel — Full Stack Docker Compose
-#
-# Services:
-#   postgres  — primary database (swap SQLite in dev)
-#   redis     — Celery broker + result backend
-#   api       — FastAPI application
-#   worker    — Celery worker for background document processing
-#   frontend  — Vite/React UI (optional, can run separately)
-# ─────────────────────────────────────────────────────────────
-
 services:
-
+ 
   # ── PostgreSQL ─────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -30,7 +17,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+ 
   # ── Redis ──────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -45,7 +32,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-
+ 
   # ── FastAPI Backend ────────────────────────────────────────
   api:
     build:
@@ -53,17 +40,17 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      APP_ENV:             production
-      DATABASE_URL:        postgresql+asyncpg://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD:-docintel_secret}@postgres:5432/${POSTGRES_DB:-docintel}
-      OPENAI_API_KEY:      ${OPENAI_API_KEY}
-      JWT_SECRET_KEY:      ${JWT_SECRET_KEY:-change-me-in-production}
-      APP_SECRET_KEY:      ${APP_SECRET_KEY:-change-me-in-production}
-      REDIS_URL:           redis://redis:6379/0
-      CELERY_BROKER_URL:   redis://redis:6379/0
+      APP_ENV:               production
+      DATABASE_URL:          postgresql+asyncpg://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD:-docintel_secret}@postgres:5432/${POSTGRES_DB:-docintel}
+      OPENAI_API_KEY:        ${OPENAI_API_KEY}
+      JWT_SECRET_KEY:        ${JWT_SECRET_KEY:-change-me-in-production}
+      APP_SECRET_KEY:        ${APP_SECRET_KEY:-change-me-in-production}
+      REDIS_URL:             redis://redis:6379/0
+      CELERY_BROKER_URL:     redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      FRONTEND_URL:        ${FRONTEND_URL:-http://localhost:5173}
-      LOG_LEVEL:           INFO
-      UPLOAD_DIR:          /app/uploads
+      FRONTEND_URL:          http://localhost:5173
+      LOG_LEVEL:             INFO
+      UPLOAD_DIR:            /app/uploads
     volumes:
       - uploads:/app/uploads
       - logs:/app/logs
@@ -79,7 +66,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+ 
   # ── Celery Worker ──────────────────────────────────────────
   worker:
     build:
@@ -88,13 +75,13 @@ services:
     restart: unless-stopped
     command: celery -A app.worker worker --loglevel=info --concurrency=4
     environment:
-      APP_ENV:             production
-      DATABASE_URL:        postgresql+asyncpg://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD:-docintel_secret}@postgres:5432/${POSTGRES_DB:-docintel}
-      OPENAI_API_KEY:      ${OPENAI_API_KEY}
-      REDIS_URL:           redis://redis:6379/0
-      CELERY_BROKER_URL:   redis://redis:6379/0
+      APP_ENV:               production
+      DATABASE_URL:          postgresql+asyncpg://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD:-docintel_secret}@postgres:5432/${POSTGRES_DB:-docintel}
+      OPENAI_API_KEY:        ${OPENAI_API_KEY}
+      REDIS_URL:             redis://redis:6379/0
+      CELERY_BROKER_URL:     redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      UPLOAD_DIR:          /app/uploads
+      UPLOAD_DIR:            /app/uploads
     volumes:
       - uploads:/app/uploads
       - logs:/app/logs
@@ -103,7 +90,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-
+ 
+  # ── React Frontend ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: http://api:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+ 
   # ── Flower (Celery monitoring) — optional ──────────────────
   flower:
     image: mher/flower:2.0
@@ -115,9 +115,10 @@ services:
       - redis
     profiles:
       - monitoring
-
+ 
 volumes:
   postgres_data:
   redis_data:
   uploads:
   logs:
+ 
