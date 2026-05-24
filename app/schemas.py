@@ -9,6 +9,8 @@ from enum import Enum
 
 
 
+
+
 # ── Enums ──────────────────────────────────────────────────────────────────────
 class UserRole(str, Enum):
     admin    = "admin"
@@ -138,7 +140,7 @@ class ExtractionOut(BaseModel):
     fields:              Optional[Dict[str, Any]]
     confidence_overall:  Optional[float]
     confidence_per_field: Optional[Dict[str, float]]
-    llm_model:          Optional[str]
+    llm_model: Optional[str] = Field(default=None, alias="model_used")
     processing_time_ms:  Optional[int]
     status:              str
     error:               Optional[str]

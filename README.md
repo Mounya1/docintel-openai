@@ -1,233 +1,259 @@
-# DocIntel — AI Document Intelligence Platform
+# 🔍 DocIntel — AI-Powered Document Intelligence Platform
 
-> Upload contracts, invoices, medical records, or reports → extract, classify, summarize, and validate data with Claude AI.
+> **Extract structured data from any document in seconds using GPT-4o.**
 
----
-
-## Architecture
-
-```
-┌──────────────┐    ┌────────────────────────────────────────────────────┐
-│   React UI   │───▶│              FastAPI Backend                        │
-│  (Vite/TS)   │    │                                                    │
-└──────────────┘    │  /api/auth         JWT login / register            │
-                    │  /api/documents    Upload, list, detail, review     │
-                    │  /api/extractions  AI results + field editing       │
-                    │  /api/schemas      Extraction schema CRUD           │
-                    │  /api/audit        Tamper-proof audit logs          │
-                    │  /api/analytics    Stats and dashboards             │
-                    │  /api/users        RBAC user management             │
-                    └───────────────┬────────────────────────────────────┘
-                                    │
-              ┌─────────────────────┼──────────────────────┐
-              ▼                     ▼                      ▼
-       ┌────────────┐       ┌──────────────┐       ┌──────────────┐
-       │  SQLite /  │       │  Claude API  │       │  Celery +    │
-       │ PostgreSQL │       │ (Extraction) │       │  Redis Queue │
-       └────────────┘       └──────────────┘       └──────────────┘
-```
-
-### Processing Pipeline
-
-```
-Upload → OCR (pypdf / Tesseract) → Claude LLM Extraction →
-Schema Validation → Business Rules → Human Review (if needed) →
-Versioned Storage → Audit Log
-```
+DocIntel is a full-stack document intelligence platform that automates document classification, field extraction, and validation using OpenAI's GPT-4o. Upload contracts, invoices, medical records, or reports — DocIntel extracts structured JSON fields with confidence scores, flags anomalies, and stores everything in a searchable database.
 
 ---
 
-## Quick Start (Development)
+## ✨ Key Features
 
-### 1. Clone and install
+| Feature | Description |
+|---|---|
+| 🤖 **AI Extraction** | GPT-4o classifies documents and extracts structured fields with 90–95% confidence |
+| 📄 **Multi-Format Support** | PDF, DOCX, images (PNG, JPG), and plain text |
+| 🔐 **Auth & RBAC** | JWT-based authentication with role-based access control (Admin, Reviewer, Viewer) |
+| ⚡ **Async Processing** | Celery + Redis task queue for background document processing |
+| ☁️ **Cloud Storage** | AWS S3 integration for secure file storage |
+| 📊 **Confidence Scoring** | Per-field and overall confidence with risk-level classification |
+| ✅ **Validation Engine** | Schema-driven rules + business logic (invoice totals, date checks, required fields) |
+| 📝 **Audit Logging** | Immutable audit trail for every action |
+| 🔌 **MCP Server** | 7-tool Model Context Protocol server for AI agent integration |
+| 🐳 **Dockerized** | One-command deployment with Docker Compose (5 containers) |
 
-```bash
-git clone <repo>
-cd docintel-py
+---
 
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    React + Vite Frontend                 │
+│                    (localhost:5173)                      │
+└──────────────────────┬──────────────────────────────────┘
+                       │ REST API
+┌──────────────────────▼──────────────────────────────────┐
+│                 FastAPI Backend (8000)                   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐  │
+│  │  Auth    │ │Documents │ │Schemas   │ │ Analytics │  │
+│  │  Routes  │ │  Routes  │ │  Routes  │ │  Routes   │  │
+│  └──────────┘ └────┬─────┘ └──────────┘ └───────────┘  │
+│                    │                                    │
+│  ┌─────────────────▼────────────────────────────────┐   │
+│  │           Processing Pipeline                     │   │
+│  │  OCR → Classification → Extraction → Validation   │   │
+│  └─────────────────┬────────────────────────────────┘   │
+└────────────────────┼────────────────────────────────────┘
+                     │
+        ┌────────────┼────────────────┐
+        ▼            ▼                ▼
+  ┌──────────┐ ┌──────────┐    ┌──────────┐
+  │PostgreSQL│ │  Redis   │    │  AWS S3  │
+  │  (Data)  │ │ (Queue)  │    │ (Files)  │
+  └──────────┘ └──────────┘    └──────────┘
 ```
 
-### 2. Configure environment
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker & Docker Compose
+- OpenAI API key
+- AWS S3 bucket (for file storage)
+
+### 1. Clone & Configure
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/docintel-openai.git
+cd docintel-openai
 cp .env.example .env
-# Edit .env — set ANTHROPIC_API_KEY at minimum
 ```
 
-### 3. Run
+Edit `.env` with your credentials:
+
+```env
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+S3_BUCKET_NAME=your-bucket-name
+```
+
+### 2. Launch
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+docker compose up --build -d
 ```
 
-API docs: http://localhost:8000/docs  
-Redoc:    http://localhost:8000/redoc
+### 3. Open
 
-### 4. Default credentials
+- **Frontend:** http://localhost:5173
+- **API Docs:** http://localhost:8000/docs
+- **Health Check:** http://localhost:8000/api/health
 
-| Email | Password | Role |
+---
+
+## 📦 Docker Services
+
+| Container | Image | Port | Purpose |
+|---|---|---|---|
+| `api` | Python 3.12 + FastAPI | 8000 | REST API server |
+| `frontend` | Node 20 + React/Vite | 5173 | Web UI |
+| `worker` | Python 3.12 + Celery | — | Background task processing |
+| `postgres` | PostgreSQL 16 | 5432 | Primary database |
+| `redis` | Redis 7 | 6379 | Task queue broker |
+
+---
+
+## 🔄 Processing Pipeline
+
+When a document is uploaded:
+
+1. **Upload** → File stored in AWS S3
+2. **OCR** → Text extracted via PyPDF2 (PDFs) or python-docx (DOCX)
+3. **Classification** → GPT-4o identifies document type (invoice, contract, report, medical)
+4. **Extraction** → GPT-4o extracts structured fields as JSON with confidence scores
+5. **Validation** → Schema rules + business logic checks
+6. **Storage** → Results persisted to PostgreSQL
+7. **Audit** → Immutable log entry created
+
+---
+
+## 🔌 API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
 |---|---|---|
-| admin@docintel.ai | Admin123! | admin |
-| reviewer@docintel.ai | Review123! | reviewer |
-
----
-
-## Production (Docker)
-
-```bash
-cp .env.example .env
-# Edit .env — set ANTHROPIC_API_KEY, JWT_SECRET_KEY, APP_SECRET_KEY
-
-docker-compose up --build -d
-```
-
-Add Flower monitoring:
-```bash
-docker-compose --profile monitoring up -d
-# Flower UI: http://localhost:5555
-```
-
----
-
-## API Reference
-
-### Auth
-```
-POST /api/auth/login          { email, password } → { access_token, user }
-POST /api/auth/register       { email, password, name, role?, department? }
-GET  /api/auth/me             → current user
-```
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login and get JWT |
+| GET | `/api/auth/me` | Get current user |
 
 ### Documents
-```
-POST /api/documents/          multipart: files[], schema_id? → [{ id, name, status }]
-GET  /api/documents/          ?status=&type=&search=&limit=&offset=
-GET  /api/documents/{id}      → DocumentDetail (with extractions + reviews)
-PATCH /api/documents/{id}     { name?, doc_type?, schema_id? }
-DELETE /api/documents/{id}    (admin/editor)
-POST /api/documents/{id}/review  { decision: approved|rejected, notes? }
-GET  /api/documents/{id}/download
-POST /api/documents/{id}/retry
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/documents/upload` | Upload document for processing |
+| GET | `/api/documents/` | List all documents |
+| GET | `/api/documents/{id}` | Get document details |
+| DELETE | `/api/documents/{id}` | Delete document |
 
 ### Extractions
-```
-GET  /api/extractions/document/{doc_id}    → [ExtractionOut]  (all versions)
-GET  /api/extractions/{id}/validations     → [ValidationOut]
-PATCH /api/extractions/{id}/fields         { fields: {...} }   → new version
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/extractions/{doc_id}` | Get extraction results |
+| GET | `/api/extractions/{id}/fields` | Get extracted fields |
 
-### Schemas
-```
-GET    /api/schemas/          → [SchemaOut]
-POST   /api/schemas/          { name, doc_type, version, definition, validation_rules }
-GET    /api/schemas/{id}
-PUT    /api/schemas/{id}      partial update
-DELETE /api/schemas/{id}      (admin)
-```
-
-### Audit
-```
-GET /api/audit/               ?user_id=&action=&search=&limit=&offset=
-GET /api/audit/export         → CSV download (admin)
-GET /api/audit/actions        → distinct action types
-```
-
-### Analytics
-```
-GET /api/analytics/overview   → totals, by_status, by_type, confidence, last 7 days
-```
-
-### Users
-```
-GET    /api/users/            (admin)
-POST   /api/users/            { email, name, role, department }
-PATCH  /api/users/{id}        { role?, department?, mfa_enabled? }
-DELETE /api/users/{id}        soft delete (admin)
-```
+### Schemas & Analytics
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/schemas/` | List extraction schemas |
+| POST | `/api/schemas/` | Create custom schema |
+| GET | `/api/analytics/dashboard` | Dashboard stats |
 
 ---
 
-## Project Structure
+## 🤖 MCP Server
+
+DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agent integration:
+
+| Tool | Description |
+|---|---|
+| `upload_document` | Upload and process a document |
+| `get_document` | Retrieve document details |
+| `list_documents` | List documents with filters |
+| `get_extraction` | Get extraction results |
+| `create_schema` | Create extraction schema |
+| `get_analytics` | Fetch dashboard analytics |
+| `search_documents` | Search across documents |
+
+---
+
+## 🛠️ Tech Stack
+
+**Backend:** Python 3.12, FastAPI, SQLAlchemy (async), Celery, Pydantic
+
+**Frontend:** React 18, Vite, TailwindCSS
+
+**AI/ML:** OpenAI GPT-4o, JSON mode extraction, Vision API
+
+**Database:** PostgreSQL 16 (asyncpg), Redis 7
+
+**Infrastructure:** Docker, Docker Compose, AWS S3
+
+**Auth:** JWT (PyJWT), bcrypt, RBAC
+
+---
+
+## 📁 Project Structure
 
 ```
-docintel-py/
+docintel-openai/
 ├── app/
-│   ├── main.py              # FastAPI app, middleware, router registration
-│   ├── config.py            # Pydantic settings (reads .env)
-│   ├── database.py          # Async SQLAlchemy engine + session + seeding
-│   ├── models.py            # ORM models: User, Document, Extraction, ...
-│   ├── schemas.py           # Pydantic request/response schemas
-│   ├── worker.py            # Celery task definitions
+│   ├── main.py                 # FastAPI app entry point
+│   ├── config.py               # Settings & environment
+│   ├── database.py             # Async SQLAlchemy engine
+│   ├── models.py               # ORM models
+│   ├── worker.py               # Celery task definitions
 │   ├── routes/
-│   │   ├── auth.py          # Login, register, /me
-│   │   ├── documents.py     # Upload, list, detail, review, download
-│   │   ├── extractions.py   # Extraction versions + field edits
-│   │   ├── schemas.py       # Schema CRUD
-│   │   ├── audit.py         # Audit log list + CSV export
-│   │   ├── analytics.py     # Stats dashboard
-│   │   └── users.py         # User management
+│   │   ├── auth.py             # Authentication endpoints
+│   │   ├── documents.py        # Document CRUD + upload
+│   │   ├── extractions.py      # Extraction results
+│   │   ├── schemas.py          # Schema management
+│   │   ├── analytics.py        # Dashboard analytics
+│   │   ├── audit.py            # Audit log viewer
+│   │   └── users.py            # User management
 │   ├── services/
-│   │   ├── auth.py          # JWT + password hashing
-│   │   ├── ocr.py           # PDF/image/DOCX text extraction
-│   │   ├── llm.py           # Claude API: classify + extract fields
-│   │   ├── validation.py    # Business rule engine
-│   │   └── pipeline.py      # Full async processing pipeline
-│   ├── middleware/
-│   │   └── auth.py          # get_current_user, require_role deps
+│   │   ├── llm.py              # OpenAI GPT-4o integration
+│   │   ├── ocr.py              # Text extraction (PDF, DOCX)
+│   │   ├── pipeline.py         # Processing orchestrator
+│   │   ├── storage.py          # AWS S3 file storage
+│   │   ├── validation.py       # Business rule validation
+│   │   └── auth.py             # Auth service
 │   └── utils/
-│       └── audit.py         # write_audit_log helper
-├── tests/
-│   └── test_pipeline.py     # Validation unit tests
-├── uploads/                 # File storage (use S3 in production)
-├── logs/                    # Application logs
-├── data/                    # SQLite DB (dev)
-├── Dockerfile
+│       └── audit.py            # Audit log writer
+├── frontend/                   # React + Vite app
+├── mcp_server/                 # MCP server (7 tools)
 ├── docker-compose.yml
-├── alembic.ini              # DB migration config
+├── Dockerfile
 ├── requirements.txt
-└── .env.example
+└── .env
 ```
 
 ---
 
-## Extending the Platform
+## 📊 Sample Extraction Output
 
-### Add a new document type
-1. Add schema via `POST /api/schemas/` with your field definitions
-2. Add validation rules in `app/services/validation.py`
-3. Schema auto-applies to all uploaded documents of that `doc_type`
-
-### Swap OCR provider
-Edit `app/services/ocr.py` — replace `_extract_pdf()` with AWS Textract:
-```python
-import boto3
-textract = boto3.client("textract", region_name=settings.aws_region)
-response = textract.analyze_document(Document={"S3Object": {...}}, FeatureTypes=["TABLES","FORMS"])
-```
-
-### Use S3 for file storage
-In `app/routes/documents.py`, replace local file write with:
-```python
-s3 = boto3.client("s3")
-s3.upload_fileobj(file.file, settings.s3_bucket_name, saved_name)
-```
-
-### Run tests
-```bash
-pytest tests/ -v
+```json
+{
+  "doc_type": "invoice",
+  "summary": "Invoice #INV-2024-001 from ABC Corp for consulting services",
+  "fields": {
+    "invoice_number": { "value": "INV-2024-001", "confidence": 98 },
+    "vendor_name": { "value": "ABC Corporation", "confidence": 95 },
+    "total_amount": { "value": "$12,500.00", "confidence": 97 },
+    "due_date": { "value": "2024-03-15", "confidence": 92 },
+    "line_items": {
+      "value": [
+        { "description": "Consulting Services", "amount": "$10,000.00" },
+        { "description": "Travel Expenses", "amount": "$2,500.00" }
+      ],
+      "confidence": 90
+    }
+  },
+  "anomalies": [],
+  "overall_confidence": 95
+}
 ```
 
 ---
 
-## Security Notes
+## 🔒 Security
 
-- All endpoints require JWT Bearer token (except `/api/auth/login` and `/api/auth/register`)
-- RBAC roles: `admin > editor > reviewer > viewer`
-- Audit logs are append-only (no delete endpoint)
-- PHI fields in medical documents log access but mask values in non-admin responses (extend as needed)
-- Production: enable HTTPS, set strong `JWT_SECRET_KEY` and `APP_SECRET_KEY`
-- HIPAA, SOC 2, GDPR compliance requires additional controls (encryption at rest, BAA with cloud provider, etc.)
+- JWT-based authentication with configurable expiration
+- Role-based access control (Admin, Reviewer, Viewer)
+- Password hashing with bcrypt
+- CORS configured for frontend origin
+- Input validation with Pydantic
+- Immutable audit log for compliance
+
+---
