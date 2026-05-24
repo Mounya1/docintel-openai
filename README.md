@@ -1,4 +1,4 @@
-# 🔍 DocIntel — AI-Powered Document Intelligence Platform
+#  DocIntel — AI-Powered Document Intelligence Platform
 
 > **Extract structured data from any document in seconds using GPT-4o.**
 
@@ -6,7 +6,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 | Feature | Description |
 |---|---|
@@ -23,7 +23,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -54,7 +54,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 
@@ -94,7 +94,7 @@ docker compose up --build -d
 
 ---
 
-## 📦 Docker Services
+##  Docker Services
 
 | Container | Image | Port | Purpose |
 |---|---|---|---|
@@ -106,7 +106,7 @@ docker compose up --build -d
 
 ---
 
-## 🔄 Processing Pipeline
+##  Processing Pipeline
 
 When a document is uploaded:
 
@@ -120,7 +120,7 @@ When a document is uploaded:
 
 ---
 
-## 🔌 API Endpoints
+##  API Endpoints
 
 ### Authentication
 | Method | Endpoint | Description |
@@ -152,7 +152,7 @@ When a document is uploaded:
 
 ---
 
-## 🤖 MCP Server
+##  MCP Server
 
 DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agent integration:
 
@@ -168,7 +168,7 @@ DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agen
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 **Backend:** Python 3.12, FastAPI, SQLAlchemy (async), Celery, Pydantic
 
@@ -184,7 +184,7 @@ DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agen
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 docintel-openai/
@@ -221,7 +221,7 @@ docintel-openai/
 
 ---
 
-## 📊 Sample Extraction Output
+##  Sample Extraction Output
 
 ```json
 {
@@ -247,7 +247,7 @@ docintel-openai/
 
 ---
 
-## 🔒 Security
+##  Security
 
 - JWT-based authentication with configurable expiration
 - Role-based access control (Admin, Reviewer, Viewer)
