@@ -1,19 +1,4 @@
-"""
-Document Processing Pipeline
-
-Steps:
-  1. OCR / text extraction
-  2. Document classification (if no schema hint)
-  3. LLM field extraction
-  4. Schema validation + business rules
-  5. Persist extraction + validations
-  6. Update document status + risk level
-  7. Create review task if needed
-  8. Write audit log
-
-Called synchronously from the background task worker.
-"""
-
+"""Document Processing Pipeline"""
 from __future__ import annotations
 
 import json
@@ -23,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.models import Document, Extraction, Validation, Review, Schema
 from app.services.ocr import extract_text_from_file
@@ -41,7 +26,8 @@ async def process_document(
     db: AsyncSession,
     uploader_id: str = "system",
 ) -> None:
-
+    """Process a document through the full extraction pipeline."""
+    
     doc_result = await db.execute(select(Document).where(Document.id == document_id))
     doc: Document = doc_result.scalar_one_or_none()
 
@@ -79,12 +65,12 @@ async def process_document(
         # ── Step 3: Classification ──────────────────
         try:
             if not doc.doc_type:
-                doc.doc_type = classify_document(raw_text)
+                doc.doc_type, _ = classify_document(raw_text)
         except Exception as e:
             logger.error(f"Classification failed: {e}")
             doc.doc_type = "document"
 
-        # ── Step 4: LLM Extraction ─────────────────
+        # ── Step 4: LLM Extraction ──────────────────
         try:
             extraction_result, processing_ms, confidence = extract_fields(
                 text=raw_text,
@@ -112,7 +98,6 @@ async def process_document(
                 confidence_per_field[key] = float(confidence or 0.0)
 
         # ── Step 5: Version ─────────────────────────
-        from sqlalchemy import func
         ver_result = await db.execute(
             select(func.max(Extraction.version)).where(Extraction.document_id == document_id)
         )
@@ -140,7 +125,7 @@ async def process_document(
         db.add(extraction)
         await db.flush()
 
-        # ── Step 7: Validation ─────────────────────
+        # ── Step 7: Validation ──────────────────────
         try:
             validation_results = validate_extraction(
                 extracted_fields=flat_fields,
@@ -148,74 +133,61 @@ async def process_document(
                 anomalies=anomalies,
                 overall_confidence=confidence,
             )
+            
+            if validation_results:
+                for result in validation_results:
+                    validation = Validation(
+                        id=str(uuid.uuid4()),
+                        extraction_id=extraction_id,
+                        rule_name=result.rule_name,
+                        rule_description=result.rule_description,
+                        passed=result.passed,
+                        severity=result.severity,
+                        message=result.message,
+                    )
+                    db.add(validation)
+                await db.flush()
+            
         except Exception as e:
-            logger.error(f"Validation failed: {e}")
-            validation_results = []
+            logger.warning(f"Validation failed: {e}")
 
-        for vr in validation_results:
-            db.add(Validation(
-                id=str(uuid.uuid4()),
-                extraction_id=extraction_id,
-                rule_name=vr.rule_name,
-                rule_description=vr.rule_description,
-                passed=vr.passed,
-                severity=vr.severity,
-                message=vr.message,
-            ))
-
-        # ── Step 8: Status & Risk ──────────────────
-        has_errors = any(not vr.passed and vr.severity == "error" for vr in validation_results)
-        has_warnings = any(not vr.passed and vr.severity == "warning" for vr in validation_results)
-        low_conf = (confidence or 0.0) < 0.85
-
-        if has_errors or has_warnings or low_conf:
-            doc.status = "needs_review"
-            doc.risk_level = "high" if has_errors else "medium"
-        else:
-            doc.status = "extracted"
+        # ── Step 8: Update document status ──────────
+        doc.status = "completed"
+        doc.extraction_id = extraction_id
+        doc.overall_confidence = float(confidence or 0.0)
+        
+        # Risk level based on confidence
+        if confidence >= 85:
             doc.risk_level = "low"
-
-        # ── Step 9: Review ─────────────────────────
-        if doc.status == "needs_review":
-            db.add(Review(
-                id=str(uuid.uuid4()),
-                document_id=document_id,
-                extraction_id=extraction_id,
-                status="pending",
-            ))
+        elif confidence >= 70:
+            doc.risk_level = "medium"
+        else:
+            doc.risk_level = "high"
 
         await db.commit()
 
-        # ── Step 10: Audit ─────────────────────────
-        await write_audit_log(
-            db=db,
-            user_id=uploader_id,
-            user_name="System",
-            action="EXTRACTION_COMPLETED",
-            resource_type="extraction",
-            resource_id=extraction_id,
-            resource_name=doc.original_name,
-            details={
-                "confidence": confidence,
-                "processing_time_ms": processing_ms,
-                "status": doc.status,
-            },
-        )
+        # ── Step 9: Audit log ───────────────────────
+        try:
+            await write_audit_log(
+                db=db,
+                action="document_processed",
+                resource_type="document",
+                resource_id=document_id,
+                details={
+                    "extraction_id": extraction_id,
+                    "confidence": confidence,
+                    "processing_ms": processing_ms,
+                    "page_count": page_count,
+                },
+                user_id=uploader_id,
+            )
+        except Exception as e:
+            logger.warning(f"Audit log failed: {e}")
 
-        logger.info(f"Pipeline complete: {doc.original_name}")
+        logger.info(f"✓ Document {document_id} processed successfully (confidence: {confidence}%)")
 
     except Exception as e:
-        logger.exception(f"Pipeline crashed: {e}")
-
-        doc.status = "error"
-
-        db.add(Extraction(
-            id=str(uuid.uuid4()),
-            document_id=document_id,
-            version=1,
-            status="failed",
-            error=str(e),
-            created_by=uploader_id,
-        ))
-
+        logger.error(f"Pipeline crashed: {e}", exc_info=True)
+        doc.status = "failed"
+        doc.error_message = str(e)[:500]
         await db.commit()

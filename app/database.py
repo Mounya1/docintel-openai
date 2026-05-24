@@ -7,17 +7,23 @@ import logging
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+def _get_sqlite_connect_args():
+    """Configure SQLite connection arguments for WAL mode."""
+    return {
+        "check_same_thread": False,
+        "timeout": 20,
+    }
+
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     pool_pre_ping=True,
-    # SQLite-specific: enable WAL mode for concurrency
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
+    connect_args=_get_sqlite_connect_args() if "sqlite" in settings.database_url else {},
 )
 
 # Enable WAL mode for SQLite
 if "sqlite" in settings.database_url:
-    @event.listens_for(engine.sync_engine, "connect")
+    @event.listens_for(engine.pool, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")

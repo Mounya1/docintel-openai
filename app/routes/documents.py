@@ -3,7 +3,6 @@ Document routes — upload, list, detail, update, delete, review.
 """
 
 import json
-from pydoc import doc
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -12,7 +11,7 @@ from fastapi import (
     APIRouter, Depends, File, Form, HTTPException,
     Query, Request, UploadFile, BackgroundTasks, status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,20 +55,29 @@ async def upload_documents(
         saved_name = f"{uuid.uuid4()}{ext}"
         dest = settings.upload_path / saved_name
 
+        # ── Save file to disk first ────────────────────────
         with dest.open("wb") as out:
             while chunk := await file.read(1024 * 64):
                 size += len(chunk)
                 if size > settings.max_upload_bytes:
                     dest.unlink(missing_ok=True)
-                    raise HTTPException(status_code=413, detail=f"File too large (max {settings.max_upload_size_mb}MB)")
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large (max {settings.max_upload_size_mb}MB)"
+                    )
                 out.write(chunk)
-                if settings.s3_bucket_name:
-                    from app.services.storage import upload_file
-                    upload_file(str(dest), saved_name)
-                    dest.unlink(missing_ok=True)
-                    file_path_value = saved_name
-                else:
-                    file_path_value = saved_name
+
+        # ── Upload to S3 if configured, otherwise keep local ──
+        if settings.s3_bucket_name:
+            try:
+                from app.services.storage import upload_file
+                upload_file(str(dest), saved_name)
+                dest.unlink(missing_ok=True)  # remove local copy after S3 upload
+            except Exception as e:
+                dest.unlink(missing_ok=True)
+                raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
+
+        file_path_value = saved_name
 
         doc_id = str(uuid.uuid4())
         doc = Document(
@@ -93,21 +101,17 @@ async def upload_documents(
             details={"size": size, "schema_id": schema_id},
             ip_address=get_client_ip(request),
         )
-        # Queue background processing
-        background_tasks.add_task(
-            _run_pipeline_in_background, doc_id, current_user.id
-        )
+
+        # ── Queue Celery task ──────────────────────────────
+        from app.worker import process_document_task
+        process_document_task.delay(doc_id, current_user.id)
         created.append({"id": doc_id, "name": file.filename, "status": "processing"})
 
     await db.commit()
     return {"documents": created}
 
 
-async def _run_pipeline_in_background(document_id: str, user_id: str):
-    """Wrapper so background task gets its own DB session."""
-    from app.database import AsyncSessionLocal
-    async with AsyncSessionLocal() as session:
-        await process_document(document_id, session, user_id)
+
 
 
 # ── List ───────────────────────────────────────────────────────────────────────
@@ -136,7 +140,6 @@ async def list_documents(
     total_result = await db.execute(select(func.count(Document.id)))
     total = total_result.scalar()
 
-    # Enrich with uploader name + confidence
     enriched = []
     for doc in docs:
         out = DocumentOut.model_validate(doc)
@@ -145,7 +148,10 @@ async def list_documents(
         out.uploaded_by_name = u.name if u else None
 
         ext_res = await db.execute(
-            select(Extraction).where(Extraction.document_id == doc.id).order_by(desc(Extraction.version)).limit(1)
+            select(Extraction)
+            .where(Extraction.document_id == doc.id)
+            .order_by(desc(Extraction.version))
+            .limit(1)
         )
         latest_ext = ext_res.scalar_one_or_none()
         if latest_ext:
@@ -163,13 +169,11 @@ async def get_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # ── Load document ─────────────────────────────────────
     result = await db.execute(select(Document).where(Document.id == doc_id))
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # ── Load extractions ───────────────────────────────────
     ext_res = await db.execute(
         select(Extraction)
         .where(Extraction.document_id == doc_id)
@@ -181,7 +185,6 @@ async def get_document(
     extractions = []
 
     for e in extractions_raw:
-    # 🔥 FIX: convert FIRST
         try:
             fields = json.loads(e.fields) if isinstance(e.fields, str) else e.fields or {}
         except Exception:
@@ -210,17 +213,14 @@ async def get_document(
             "error": e.error,
             "created_at": e.created_at,
         })
-
         extractions.append(eout)
 
-    # ── Load reviews ───────────────────────────────────────
     rev_res = await db.execute(select(Review).where(Review.document_id == doc_id))
     reviews_raw = rev_res.scalars().all()
 
     from app.schemas import ReviewOut
     reviews = [ReviewOut.model_validate(r) for r in reviews_raw]
 
-    # ── SAFE RESPONSE BUILD (NO Pydantic crash) ────────────
     detail = {
         "id": doc.id,
         "name": doc.name or "",
@@ -242,25 +242,22 @@ async def get_document(
         "reviews": [],
     }
 
-    # ── Add uploader name ──────────────────────────────────
     user_res = await db.execute(select(User).where(User.id == doc.uploaded_by))
     u = user_res.scalar_one_or_none()
     detail["uploaded_by_name"] = u.name if u else "Unknown"
 
-    # ── Add extraction info ────────────────────────────────
     if extractions:
         latest = extractions[0]
         detail["confidence"] = float(latest.confidence_overall or 0.0)
         detail["current_version"] = latest.version or 1
 
-    # ── Attach lists ───────────────────────────────────────
     detail["extractions"] = extractions
     detail["reviews"] = reviews
 
     return detail
 
-from fastapi.responses import FileResponse
 
+# ── Download ───────────────────────────────────────────────────────────────────
 @router.get("/{doc_id}/download")
 async def download_document(
     doc_id: str,
@@ -273,8 +270,17 @@ async def download_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    file_path = settings.upload_path / doc.file_path
+    # ── Serve from S3 if configured ────────────────────────
+    if settings.s3_bucket_name:
+        try:
+            from app.services.storage import get_presigned_url
+            url = get_presigned_url(doc.file_path)
+            return RedirectResponse(url=url)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"S3 download failed: {str(e)}")
 
+    # ── Serve from local disk ──────────────────────────────
+    file_path = settings.upload_path / doc.file_path
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on server")
 
@@ -283,6 +289,9 @@ async def download_document(
         filename=doc.original_name,
         media_type=doc.mime_type,
     )
+
+
+# ── Review ─────────────────────────────────────────────────────────────────────
 @router.post("/{doc_id}/review", response_model=SuccessResponse)
 async def review_document(
     doc_id: str,
@@ -323,10 +332,10 @@ async def review_document(
     )
 
     await db.commit()
+    return SuccessResponse(message=f"Document {body.decision}")
 
-    return SuccessResponse(
-        message=f"Document {body.decision}"
-    )
+
+# ── Delete ─────────────────────────────────────────────────────────────────────
 @router.delete("/{doc_id}", response_model=SuccessResponse)
 async def delete_document(
     doc_id: str,
@@ -340,10 +349,17 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    file_path = settings.upload_path / doc.file_path
-
-    if file_path.exists():
-        file_path.unlink(missing_ok=True)
+    # ── Delete from S3 if configured ──────────────────────
+    if settings.s3_bucket_name:
+        try:
+            from app.services.storage import delete_file
+            delete_file(doc.file_path)
+        except Exception:
+            pass  # log but don't block deletion
+    else:
+        file_path = settings.upload_path / doc.file_path
+        if file_path.exists():
+            file_path.unlink(missing_ok=True)
 
     await db.delete(doc)
 
@@ -359,5 +375,4 @@ async def delete_document(
     )
 
     await db.commit()
-
     return SuccessResponse(message="Document deleted")
