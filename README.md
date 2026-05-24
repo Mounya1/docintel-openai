@@ -65,7 +65,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 ### 1. Clone & Configure
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/docintel-openai.git
+git clone https://github.com/Mounya1/docintel-openai
 cd docintel-openai
 cp .env.example .env
 ```
