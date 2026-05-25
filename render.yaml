@@ -38,8 +38,9 @@ services:
     healthCheckPath: /api/health
 
   # ── Frontend (Static Site) ───────────────────
-  - type: static
+  - type: web
     name: docintel-frontend
+    runtime: static
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
     envVars:
