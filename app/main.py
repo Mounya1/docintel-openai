@@ -3,6 +3,7 @@ DocIntel — AI Document Intelligence Platform
 FastAPI Application Entry Point
 """
 
+import app.render_config  # noqa: F401 — patch DB URL for Render
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
