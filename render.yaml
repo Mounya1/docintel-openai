@@ -41,8 +41,9 @@ services:
   - type: web
     name: docintel-frontend
     runtime: static
-    buildCommand: cd frontend && npm ci && npm run build
-    staticPublishPath: frontend/dist
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
         value: https://docintel-api.onrender.com
