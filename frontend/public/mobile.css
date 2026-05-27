@@ -1,0 +1,84 @@
+
+@media (max-width: 768px) {
+  /* Login page - stack vertically */
+  div[style*="grid-template-columns: 1.1fr 0.9fr"],
+  div[style*="grid-template-columns:1.1fr 0.9fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Dashboard stats - 2 columns on mobile */
+  div[style*="grid-template-columns: repeat(4"],
+  div[style*="grid-template-columns:repeat(4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  /* Charts - single column */
+  div[style*="grid-template-columns: 1fr 1fr 1fr"],
+  div[style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Confidence + recent docs - stack */
+  div[style*="grid-template-columns: 300px 1fr"],
+  div[style*="grid-template-columns:300px 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Documents tab - stack */
+  div[style*="grid-template-columns: 1fr 420px"],
+  div[style*="grid-template-columns:1fr 420px"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Upload form - stack */
+  div[style*="grid-template-columns: 1fr 1fr auto"],
+  div[style*="grid-template-columns:1fr 1fr auto"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Feature cards - single column */
+  div[style*="grid-template-columns: 1fr 1fr"][style*="gap: 10px"],
+  div[style*="grid-template-columns:1fr 1fr"][style*="gap:10"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Header - compact */
+  header > div > div:first-child { gap: 10px !important; }
+  header nav { overflow-x: auto; flex-wrap: nowrap; }
+  header nav button { padding: 6px 10px !important; font-size: 12px !important; white-space: nowrap; }
+  
+  /* Header right side - hide name */
+  header > div > div:last-child { gap: 6px !important; }
+  
+  /* Reduce padding on mobile */
+  div[style*="padding: 24px 28px"],
+  div[style*="padding:24px 28px"] {
+    padding: 12px 14px !important;
+  }
+  
+  /* Login card padding */
+  div[style*="padding: 40px"],
+  div[style*="padding:40"] {
+    padding: 20px !important;
+  }
+  
+  /* Document detail info grid */
+  div[style*="grid-template-columns: 1fr 1fr"][style*="gap: 8px"],
+  div[style*="grid-template-columns:1fr 1fr"][style*="gap:8"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Even smaller screens - stats single column */
+  div[style*="grid-template-columns: repeat(4"],
+  div[style*="grid-template-columns:repeat(4"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Feature cards single column */
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
