@@ -80,3 +80,7 @@ def delete_from_s3(s3_key: str, settings=None) -> None:
     except ClientError as e:
         logger.error(f"S3 delete failed for {s3_key}: {e}")
         raise
+# Aliases for routes compatibility
+upload_file = upload_to_s3
+delete_file = delete_from_s3
+
