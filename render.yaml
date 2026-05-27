@@ -40,7 +40,7 @@ services:
     name: docintel-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: VITE_API_BASE_URL=https://docintel-api-wnb5.onrender.com npm ci && VITE_API_BASE_URL=https://docintel-api-wnb5.onrender.com npm run build
+    buildCommand: export VITE_API_BASE_URL=https://docintel-api-wnb5.onrender.com && npm ci && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
