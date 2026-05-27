@@ -43,6 +43,14 @@ async def process_document(
     try:
         # ── Step 1: OCR ─────────────────────────────
         try:
+            # Download from S3 if file not local
+            if not file_path.exists():
+                try:
+                    from app.services.storage import download_from_s3
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    download_from_s3(doc.file_path, str(file_path))
+                except Exception as e:
+                    logger.warning(f"S3 download for OCR: {e}")
             raw_text, page_count = extract_text_from_file(file_path)
         except Exception as e:
             logger.error(f"OCR failed: {e}")
