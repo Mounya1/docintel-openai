@@ -282,9 +282,16 @@ async def download_document(
     # ── Serve from S3 if configured ────────────────────────
     if settings.s3_bucket_name:
         try:
-            from app.services.storage import get_presigned_url
-            url = get_presigned_url(doc.file_path)
-            return RedirectResponse(url=url)
+            from app.services.storage import download_from_s3
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=doc.file_path.split(".")[-1])
+            download_from_s3(doc.file_path, tmp.name)
+            from fastapi.responses import FileResponse
+            return FileResponse(
+                tmp.name,
+                media_type="application/octet-stream",
+                filename=doc.original_name or doc.file_path,
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"S3 download failed: {str(e)}")
 
