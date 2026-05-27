@@ -102,9 +102,18 @@ async def upload_documents(
             ip_address=get_client_ip(request),
         )
 
-        # ── Queue Celery task ──────────────────────────────
-        from app.worker import process_document_task
-        process_document_task.delay(doc_id, current_user.id)
+        # ── Process document (Celery if Redis available, else inline) ──
+        try:
+            from app.worker import process_document_task
+            process_document_task.delay(doc_id, current_user.id)
+        except Exception:
+            import asyncio
+            from app.services.pipeline import process_document
+            from app.database import AsyncSessionLocal
+            async def _run():
+                async with AsyncSessionLocal() as session:
+                    await process_document(doc_id, session, current_user.id)
+            asyncio.ensure_future(_run())
         created.append({"id": doc_id, "name": file.filename, "status": "processing"})
 
     await db.commit()
