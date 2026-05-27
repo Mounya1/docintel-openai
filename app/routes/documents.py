@@ -287,9 +287,13 @@ async def download_document(
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=doc.file_path.split(".")[-1])
             download_from_s3(doc.file_path, tmp.name)
             from fastapi.responses import FileResponse
+            # Detect media type for preview
+            ext = doc.file_path.rsplit(".", 1)[-1].lower()
+            media_types = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+            mt = media_types.get(ext, "application/octet-stream")
             return FileResponse(
                 tmp.name,
-                media_type="application/octet-stream",
+                media_type=mt,
                 filename=doc.original_name or doc.file_path,
             )
         except Exception as e:
