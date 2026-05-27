@@ -5,7 +5,6 @@ databases:
     user: docintel
 
 services:
-  # ── API Backend ──────────────────────────────
   - type: web
     name: docintel-api
     plan: free
@@ -34,15 +33,14 @@ services:
       - key: APP_ENV
         value: production
       - key: FRONTEND_URL
-        value: https://docintel-frontend.onrender.com
+        value: https://docintel-frontend-h454.onrender.com
     healthCheckPath: /api/health
 
-  # ── Frontend (Static Site) ───────────────────
   - type: web
     name: docintel-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: npm ci && npm run build
+    buildCommand: VITE_API_BASE_URL=https://docintel-api.onrender.com npm ci && VITE_API_BASE_URL=https://docintel-api.onrender.com npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
