@@ -1,6 +1,8 @@
-#  DocIntel — AI-Powered Document Intelligence Platform
+#  DocIntel — AI-Document Intelligence Platform
 
 > **Extract structured data from any document in seconds using GPT-4o.**
+
+** [Live Demo](https://docintel-frontend-h454.onrender.com)** · ** [API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
 
 DocIntel is a full-stack document intelligence platform that automates document classification, field extraction, and validation using OpenAI's GPT-4o. Upload contracts, invoices, medical records, or reports — DocIntel extracts structured JSON fields with confidence scores, flags anomalies, and stores everything in a searchable database.
 
@@ -10,16 +12,16 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 | Feature | Description |
 |---|---|
-| 🤖 **AI Extraction** | GPT-4o classifies documents and extracts structured fields with 90–95% confidence |
-| 📄 **Multi-Format Support** | PDF, DOCX, images (PNG, JPG), and plain text |
-| 🔐 **Auth & RBAC** | JWT-based authentication with role-based access control (Admin, Reviewer, Viewer) |
-| ⚡ **Async Processing** | Celery + Redis task queue for background document processing |
-| ☁️ **Cloud Storage** | AWS S3 integration for secure file storage |
-| 📊 **Confidence Scoring** | Per-field and overall confidence with risk-level classification |
-| ✅ **Validation Engine** | Schema-driven rules + business logic (invoice totals, date checks, required fields) |
-| 📝 **Audit Logging** | Immutable audit trail for every action |
-| 🔌 **MCP Server** | 7-tool Model Context Protocol server for AI agent integration |
-| 🐳 **Dockerized** | One-command deployment with Docker Compose (5 containers) |
+|  **AI Extraction** | GPT-4o classifies documents and extracts structured fields with 90–95% confidence |
+|  **Multi-Format Support** | PDF, DOCX, images (PNG, JPG), and plain text |
+|  **Auth & RBAC** | JWT-based authentication with role-based access control (Admin, Reviewer, Viewer) |
+|  **Async Processing** | Celery + Redis task queue for background document processing |
+|  **Cloud Storage** | AWS S3 integration for secure file storage |
+|  **Confidence Scoring** | Per-field and overall confidence with risk-level classification |
+|  **Validation Engine** | Schema-driven rules + business logic (invoice totals, date checks, required fields) |
+|  **Audit Logging** | Immutable audit trail for every action |
+|  **MCP Server** | 7-tool Model Context Protocol server for AI agent integration |
+|  **Dockerized** | One-command deployment with Docker Compose (5 containers) |
 
 ---
 
@@ -28,11 +30,11 @@ DocIntel is a full-stack document intelligence platform that automates document 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    React + Vite Frontend                 │
-│                    (localhost:5173)                      │
+│              docintel-frontend-h454.onrender.com        │
 └──────────────────────┬──────────────────────────────────┘
                        │ REST API
 ┌──────────────────────▼──────────────────────────────────┐
-│                 FastAPI Backend (8000)                   │
+│              FastAPI Backend (Render)                    │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐  │
 │  │  Auth    │ │Documents │ │Schemas   │ │ Analytics │  │
 │  │  Routes  │ │  Routes  │ │  Routes  │ │  Routes   │  │
@@ -54,7 +56,23 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 ---
 
-##  Quick Start
+##  Live Demo
+
+| | URL |
+|---|---|
+| **Frontend** | [docintel-frontend-h454.onrender.com](https://docintel-frontend-h454.onrender.com) |
+| **API Docs** | [docintel-api-wnb5.onrender.com/docs](https://docintel-api-wnb5.onrender.com/docs) |
+| **Health Check** | [docintel-api-wnb5.onrender.com/api/health](https://docintel-api-wnb5.onrender.com/api/health) |
+
+**Demo Credentials:**
+- Admin: `admin@docintel.ai` / `Admin123!`
+- Reviewer: `reviewer@docintel.ai` / `Review123!`
+
+> Note: Free tier — API may take ~30s to wake after inactivity.
+
+---
+
+##  Quick Start (Local)
 
 ### Prerequisites
 
@@ -65,7 +83,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 ### 1. Clone & Configure
 
 ```bash
-git clone https://github.com/Mounya1/docintel-openai
+git clone https://github.com/Mounya1/docintel-openai.git
 cd docintel-openai
 cp .env.example .env
 ```
@@ -90,7 +108,6 @@ docker compose up --build -d
 
 - **Frontend:** http://localhost:5173
 - **API Docs:** http://localhost:8000/docs
-- **Health Check:** http://localhost:8000/api/health
 
 ---
 
@@ -178,7 +195,7 @@ DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agen
 
 **Database:** PostgreSQL 16 (asyncpg), Redis 7
 
-**Infrastructure:** Docker, Docker Compose, AWS S3
+**Infrastructure:** Docker, Docker Compose, AWS S3, Render
 
 **Auth:** JWT (PyJWT), bcrypt, RBAC
 
@@ -215,6 +232,7 @@ docintel-openai/
 ├── mcp_server/                 # MCP server (7 tools)
 ├── docker-compose.yml
 ├── Dockerfile
+├── render.yaml                 # Render deployment config
 ├── requirements.txt
 └── .env
 ```
@@ -226,19 +244,16 @@ docintel-openai/
 ```json
 {
   "doc_type": "invoice",
-  "summary": "Invoice #INV-2024-001 from ABC Corp for consulting services",
+  "summary": "Invoice #INV-3337 from Sliced Invoices for web design services",
   "fields": {
-    "invoice_number": { "value": "INV-2024-001", "confidence": 98 },
-    "vendor_name": { "value": "ABC Corporation", "confidence": 95 },
-    "total_amount": { "value": "$12,500.00", "confidence": 97 },
-    "due_date": { "value": "2024-03-15", "confidence": 92 },
-    "line_items": {
-      "value": [
-        { "description": "Consulting Services", "amount": "$10,000.00" },
-        { "description": "Travel Expenses", "amount": "$2,500.00" }
-      ],
-      "confidence": 90
-    }
+    "invoice_number": { "value": "INV-3337", "confidence": 98 },
+    "order_number": { "value": "12345", "confidence": 95 },
+    "invoice_date": { "value": "2016-01-25", "confidence": 97 },
+    "due_date": { "value": "2016-01-31", "confidence": 97 },
+    "total_due": { "value": "$93.50", "confidence": 99 },
+    "service_description": { "value": "Web Design", "confidence": 95 },
+    "tax": { "value": "$8.50", "confidence": 94 },
+    "payment_status": { "value": "Paid", "confidence": 90 }
   },
   "anomalies": [],
   "overall_confidence": 95
@@ -257,3 +272,6 @@ docintel-openai/
 - Immutable audit log for compliance
 
 ---
+
+
+
