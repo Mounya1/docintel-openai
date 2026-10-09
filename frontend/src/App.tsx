@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// Tolerate "https://host/" and "https://host/api" — every request path already starts with /api
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000")
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 // ─── Types (matched exactly to backend schemas.py) ────────────────────────────
 type User = { id: string; email: string; name: string; role: string; department?: string | null; avatar_initials?: string | null; last_login?: string | null; created_at: string };
