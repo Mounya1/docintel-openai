@@ -10,10 +10,11 @@ logger = logging.getLogger(__name__)
 
 def _s3_client(settings):
     """Create S3 client from settings."""
+    # Empty keys fall back to boto3's default chain (e.g. an EC2 instance role)
     return boto3.client(
         "s3",
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
+        aws_access_key_id=settings.aws_access_key_id or None,
+        aws_secret_access_key=settings.aws_secret_access_key or None,
         region_name=settings.aws_region,
     )
 

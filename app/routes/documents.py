@@ -104,6 +104,8 @@ async def upload_documents(
 
         # ── Process document (Celery if Redis available, else inline) ──
         try:
+            if not settings.use_celery:
+                raise RuntimeError("Celery disabled")
             from app.worker import process_document_task
             process_document_task.delay(doc_id, current_user.id)
         except Exception:

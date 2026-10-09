@@ -1,3 +1,4 @@
+# Backend only. The frontend is deployed on Vercel (see frontend/vercel.json).
 databases:
   - name: docintel-db
     plan: free
@@ -19,7 +20,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-4o
+        value: gpt-4o-mini
       - key: AWS_ACCESS_KEY_ID
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
@@ -30,18 +31,10 @@ services:
         sync: false
       - key: JWT_SECRET_KEY
         generateValue: true
+      - key: APP_SECRET_KEY
+        generateValue: true
       - key: APP_ENV
         value: production
-      - key: FRONTEND_URL
-        value: https://docintel-frontend-h454.onrender.com
+      - key: USE_CELERY
+        value: "false"
     healthCheckPath: /api/health
-
-  - type: web
-    name: docintel-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: export VITE_API_BASE_URL=https://docintel-api-wnb5.onrender.com && npm ci && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_BASE_URL
-        value: https://docintel-api-wnb5.onrender.com

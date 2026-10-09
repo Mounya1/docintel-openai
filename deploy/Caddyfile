@@ -1,0 +1,9 @@
+# Caddy gets and renews a Let's Encrypt certificate for API_DOMAIN automatically.
+# With no custom domain, use <elastic-ip-with-dashes>.sslip.io, e.g. 3-91-20-15.sslip.io
+{$API_DOMAIN} {
+	request_body {
+		max_size 60MB
+	}
+	encode gzip
+	reverse_proxy api:8000
+}
