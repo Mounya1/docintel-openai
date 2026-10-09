@@ -10,7 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, Optional
+
+from dotenv import load_dotenv
+
+# DATABASE_URL lives in the git-ignored .env.mcp so credentials stay out of .vscode/mcp.json
+load_dotenv(Path(__file__).resolve().parents[1] / ".env.mcp", override=True)
+import app.render_config  # noqa: E402,F401 — accept postgres:// URLs as Render/Neon show them
 
 from sqlalchemy import desc, func, select, text
 
@@ -106,7 +113,7 @@ async def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "app_env": settings.app_env,
-        "database_url": settings.database_url,
+        "database": settings.database_url.split("@")[-1].split("?")[0],  # host/db only, never the password
     }
 
 

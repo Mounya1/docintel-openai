@@ -9,10 +9,7 @@
         "-m",
         "app.mcp_server"
       ],
-      "cwd": "C:\\Users\\mouny\\docintel-openai",
-      "env": {
-        "DATABASE_URL": "postgresql+asyncpg://docintel:docintel_secret@127.0.0.1:5432/docintel"
-      }
+      "cwd": "C:\\Users\\mouny\\docintel-openai"
     }
   }
 }
