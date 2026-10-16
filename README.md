@@ -2,7 +2,7 @@
 
 > **Extract structured data from any document in seconds using GPT-4o.**
 
-** [Live Demo](https://docintel-frontend-h454.onrender.com)** · ** [API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
+**[Live Demo](https://docintel-openai.vercel.app)** · **[API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
 
 DocIntel is a full-stack document intelligence platform that automates document classification, field extraction, and validation using OpenAI's GPT-4o. Upload contracts, invoices, medical records, or reports — DocIntel extracts structured JSON fields with confidence scores, flags anomalies, and stores everything in a searchable database.
 
@@ -13,15 +13,16 @@ DocIntel is a full-stack document intelligence platform that automates document 
 | Feature | Description |
 |---|---|
 |  **AI Extraction** | GPT-4o classifies documents and extracts structured fields with 90–95% confidence |
-|  **Multi-Format Support** | PDF, DOCX, images (PNG, JPG), and plain text |
+|  **Multi-Format Support** | PDF, images (PNG, JPG via GPT-4o vision), DOCX, XLSX, TXT, CSV |
 |  **Auth & RBAC** | JWT-based authentication with role-based access control (Admin, Reviewer, Viewer) |
-|  **Async Processing** | Celery + Redis task queue for background document processing |
+|  **Async Processing** | Optional Celery + Redis queue (`USE_CELERY=true`); otherwise processed in-process |
 |  **Cloud Storage** | AWS S3 integration for secure file storage |
 |  **Confidence Scoring** | Per-field and overall confidence with risk-level classification |
 |  **Validation Engine** | Schema-driven rules + business logic (invoice totals, date checks, required fields) |
 |  **Audit Logging** | Immutable audit trail for every action |
-|  **MCP Server** | 7-tool Model Context Protocol server for AI agent integration |
-|  **Dockerized** | One-command deployment with Docker Compose (5 containers) |
+|  **MCP Server** | 9-tool Model Context Protocol server for Copilot / Claude integration |
+|  **Dockerized** | One-command local stack with Docker Compose (5 containers) |
+|  **Cloud Deployed** | Frontend on Vercel, API + Postgres on Render, files on AWS S3 |
 
 ---
 
@@ -29,8 +30,8 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    React + Vite Frontend                 │
-│              docintel-frontend-h454.onrender.com        │
+│              React + Vite Frontend (Vercel)             │
+│                docintel-openai.vercel.app               │
 └──────────────────────┬──────────────────────────────────┘
                        │ REST API
 ┌──────────────────────▼──────────────────────────────────┐
@@ -50,7 +51,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
         ▼            ▼                ▼
   ┌──────────┐ ┌──────────┐    ┌──────────┐
   │PostgreSQL│ │  Redis   │    │  AWS S3  │
-  │  (Data)  │ │ (Queue)  │    │ (Files)  │
+  │ (Render) │ │(optional)│    │ (Files)  │
   └──────────┘ └──────────┘    └──────────┘
 ```
 
@@ -60,7 +61,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 
 | | URL |
 |---|---|
-| **Frontend** | [docintel-frontend-h454.onrender.com](https://docintel-frontend-h454.onrender.com) |
+| **Frontend** | [docintel-openai.vercel.app](https://docintel-openai.vercel.app) |
 | **API Docs** | [docintel-api-wnb5.onrender.com/docs](https://docintel-api-wnb5.onrender.com/docs) |
 | **Health Check** | [docintel-api-wnb5.onrender.com/api/health](https://docintel-api-wnb5.onrender.com/api/health) |
 
@@ -68,7 +69,7 @@ DocIntel is a full-stack document intelligence platform that automates document 
 - Admin: `admin@docintel.ai` / `Admin123!`
 - Reviewer: `reviewer@docintel.ai` / `Review123!`
 
-> Note: Free tier — API may take ~30s to wake after inactivity.
+> Note: The API runs on Render's free tier and may take ~50s to wake after inactivity.
 
 ---
 
@@ -88,15 +89,8 @@ cd docintel-openai
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials:
-
-```env
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-4o
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-S3_BUCKET_NAME=your-bucket-name
-```
+Edit `.env` and set at least `OPENAI_API_KEY`. Fill in the `AWS_*` and `S3_BUCKET_NAME`
+values to store uploads in S3; leave them blank to keep files on local disk.
 
 ### 2. Launch
 
@@ -123,12 +117,27 @@ docker compose up --build -d
 
 ---
 
+##  Deployment
+
+| Part | Platform | Config |
+|---|---|---|
+| Frontend | Vercel | `frontend/vercel.json` — project root `frontend`, env `VITE_API_BASE_URL=https://docintel-api-wnb5.onrender.com` |
+| API + Postgres | Render (Blueprint) | `render.yaml` — Docker web service + free Postgres |
+| Files | AWS S3 | `S3_BUCKET_NAME` + AWS keys set in Render |
+
+Pushing to `main` redeploys both Vercel and Render automatically.
+
+> Render's free Postgres expires after 30 days. For a permanent free setup (Oracle Cloud
+> Always Free VM + Neon Postgres + Caddy HTTPS), see [`deploy/README.md`](deploy/README.md).
+
+---
+
 ##  Processing Pipeline
 
 When a document is uploaded:
 
 1. **Upload** → File stored in AWS S3
-2. **OCR** → Text extracted via PyPDF2 (PDFs) or python-docx (DOCX)
+2. **Text Extraction** → pypdf for PDFs (optional Tesseract OCR for scans), GPT-4o vision for images
 3. **Classification** → GPT-4o identifies document type (invoice, contract, report, medical)
 4. **Extraction** → GPT-4o extracts structured fields as JSON with confidence scores
 5. **Validation** → Schema rules + business logic checks
@@ -138,6 +147,8 @@ When a document is uploaded:
 ---
 
 ##  API Endpoints
+
+All routes are under `/api`. Interactive reference: [`/docs`](https://docintel-api-wnb5.onrender.com/docs).
 
 ### Authentication
 | Method | Endpoint | Description |
@@ -149,39 +160,68 @@ When a document is uploaded:
 ### Documents
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/documents/upload` | Upload document for processing |
-| GET | `/api/documents/` | List all documents |
+| POST | `/api/documents/` | Upload one or more documents for processing |
+| GET | `/api/documents/` | List documents (filter by `status`, `type`, `search`) |
 | GET | `/api/documents/{id}` | Get document details |
+| GET | `/api/documents/{id}/download` | Download the original file |
+| POST | `/api/documents/{id}/review` | Approve or reject a document |
 | DELETE | `/api/documents/{id}` | Delete document |
 
 ### Extractions
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/extractions/{doc_id}` | Get extraction results |
-| GET | `/api/extractions/{id}/fields` | Get extracted fields |
+| GET | `/api/extractions/document/{doc_id}` | All extraction versions for a document |
+| GET | `/api/extractions/{id}/validations` | Validation results for an extraction |
+| PATCH | `/api/extractions/{id}/fields` | Edit fields (creates a new version) |
 
-### Schemas & Analytics
+### Schemas, Analytics, Audit & Users
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/schemas/` | List extraction schemas |
-| POST | `/api/schemas/` | Create custom schema |
-| GET | `/api/analytics/dashboard` | Dashboard stats |
+| GET / POST | `/api/schemas/` | List or create extraction schemas |
+| GET / PUT / DELETE | `/api/schemas/{id}` | Get, update or delete a schema |
+| GET | `/api/analytics/overview` | Dashboard stats |
+| GET | `/api/audit/` | Audit log (paginated) |
+| GET | `/api/audit/export` | Export audit log as CSV |
+| GET / POST | `/api/users/` | List or create users (admin) |
+| PATCH / DELETE | `/api/users/{id}` | Update or deactivate a user (admin) |
 
 ---
 
 ##  MCP Server
 
-DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agent integration:
+`app/mcp_server.py` is a Model Context Protocol server that lets AI assistants
+(GitHub Copilot in VS Code, Claude Code, Claude Desktop) query DocIntel data directly.
 
 | Tool | Description |
 |---|---|
-| `upload_document` | Upload and process a document |
-| `get_document` | Retrieve document details |
+| `health` | Server status and connected database (host only) |
 | `list_documents` | List documents with filters |
-| `get_extraction` | Get extraction results |
-| `create_schema` | Create extraction schema |
-| `get_analytics` | Fetch dashboard analytics |
-| `search_documents` | Search across documents |
+| `get_document` | Document details with latest extraction |
+| `list_schemas` | List extraction schemas |
+| `list_extractions` | Extraction versions for a document |
+| `list_audit_logs` | Recent audit log entries |
+| `analytics_overview` | Dashboard statistics |
+| `summarize_document` | AI summary of a document |
+| `ask_document` | Ask a question about a document |
+
+### Setup
+
+1. Create `.env.mcp` in the project root (git-ignored) with the database to query:
+   ```env
+   # Local docker-compose database
+   DATABASE_URL=postgresql+asyncpg://docintel:docintel_secret@127.0.0.1:5432/docintel
+   # Or the live Render database (External Database URL, pasted as-is)
+   # DATABASE_URL=postgresql://docintel:...@dpg-xxxx.oregon-postgres.render.com/docintel
+   ```
+2. **VS Code:** `.vscode/mcp.json` already registers `docintel-mcp`. Run
+   **MCP: List Servers → docintel-mcp → Start Server**, then use Copilot Chat in **Agent** mode.
+3. **Claude Code:**
+   ```bash
+   claude mcp add docintel -- .venv/bin/python3 -m app.mcp_server
+   ```
+
+Example prompts: *"Give me an analytics overview"*, *"List documents that need review"*,
+*"Summarize document `<id>`"*.
 
 ---
 
@@ -189,15 +229,15 @@ DocIntel includes a Model Context Protocol (MCP) server with 7 tools for AI agen
 
 **Backend:** Python 3.12, FastAPI, SQLAlchemy (async), Celery, Pydantic
 
-**Frontend:** React 18, Vite, TailwindCSS
+**Frontend:** React 19, TypeScript, Vite, Tailwind CSS 4
 
-**AI/ML:** OpenAI GPT-4o, JSON mode extraction, Vision API
+**AI/ML:** OpenAI GPT-4o / GPT-4o-mini, JSON mode extraction, vision input for images
 
-**Database:** PostgreSQL 16 (asyncpg), Redis 7
+**Database:** PostgreSQL 16 (asyncpg), SQLite for quick local dev, Redis 7 (optional)
 
-**Infrastructure:** Docker, Docker Compose, AWS S3, Render
+**Infrastructure:** Docker, Docker Compose, Vercel, Render, AWS S3
 
-**Auth:** JWT (PyJWT), bcrypt, RBAC
+**Auth:** JWT (python-jose), bcrypt, RBAC
 
 ---
 
@@ -208,6 +248,8 @@ docintel-openai/
 ├── app/
 │   ├── main.py                 # FastAPI app entry point
 │   ├── config.py               # Settings & environment
+│   ├── render_config.py        # Normalizes hosted Postgres URLs for asyncpg
+│   ├── mcp_server.py           # MCP server (9 tools)
 │   ├── database.py             # Async SQLAlchemy engine
 │   ├── models.py               # ORM models
 │   ├── worker.py               # Celery task definitions
@@ -228,13 +270,13 @@ docintel-openai/
 │   │   └── auth.py             # Auth service
 │   └── utils/
 │       └── audit.py            # Audit log writer
-├── frontend/                   # React + Vite app
-├── mcp_server/                 # MCP server (7 tools)
+├── frontend/                   # React + Vite app (vercel.json for Vercel)
+├── deploy/                     # Optional self-hosted setup (Caddy, Oracle/EC2, Neon)
 ├── docker-compose.yml
 ├── Dockerfile
 ├── render.yaml                 # Render deployment config
 ├── requirements.txt
-└── .env
+└── .env.example                # Copy to .env
 ```
 
 ---
@@ -267,11 +309,9 @@ docintel-openai/
 - JWT-based authentication with configurable expiration
 - Role-based access control (Admin, Reviewer, Viewer)
 - Password hashing with bcrypt
-- CORS configured for frontend origin
+- CORS middleware (currently allows all origins; restrict before handling sensitive data)
 - Input validation with Pydantic
 - Immutable audit log for compliance
+- Secrets kept in git-ignored `.env` / `.env.mcp` and platform environment variables
 
 ---
-
-
-
