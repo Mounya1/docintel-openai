@@ -2,7 +2,11 @@
 
 > **Extract structured data from any document in seconds using GPT-4o.**
 
+<<<<<<< HEAD
 **[Live Demo](https://docintel-openai.vercel.app)** · **[API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
+=======
+** [Live Demo](https://docintel-openai.vercel.app/)** · ** [API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
+>>>>>>> 8522aa2f3f410890e4d274b3c082f971a1db62ac
 
 DocIntel is a full-stack document intelligence platform that automates document classification, field extraction, and validation using OpenAI's GPT-4o. Upload contracts, invoices, medical records, or reports — DocIntel extracts structured JSON fields with confidence scores, flags anomalies, and stores everything in a searchable database.
 
