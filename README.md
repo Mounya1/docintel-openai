@@ -2,7 +2,6 @@
 
 > **Extract structured data from any document in seconds using GPT-4o.**
 
-<<<<<<< HEAD
 **[Live Demo](https://docintel-openai.vercel.app)** · **[API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
 =======
 ** [Live Demo](https://docintel-openai.vercel.app/)** · ** [API Docs](https://docintel-api-wnb5.onrender.com/docs)** · **Demo: admin@docintel.ai / Admin123!**
